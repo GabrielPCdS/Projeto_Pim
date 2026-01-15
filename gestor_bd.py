@@ -280,3 +280,77 @@ class GestorBD:
             return False, str(ve)
         finally:
             self.fechar_conexao()
+
+    # -----------------------------------------------
+    # MÉTODOS DE NOTAS
+    # -----------------------------------------------
+
+    def buscar_todos_alunos_da_materia(self, materia: str) -> typing.List[tuple[str, str]]:
+        """
+        Retorna uma lista de tuplas (nome, ra) de todos os alunos que estão matriculados
+        na matéria.
+        """
+        self._conectar()
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT A.nome, A.ra 
+                FROM Alunos A
+                INNER JOIN Notas N ON A.ra = N.ra_aluno 
+                WHERE N.materia = ?
+                ORDER BY A.nome
+            """, (materia,))
+            return [(row['nome'], row['ra']) for row in cursor.fetchall()] 
+        except sqlite3.Error as e:
+            print(f"Erro ao buscar alunos da matéria: {e}")
+            return []
+        finally:
+            self.fechar_conexao()
+
+    def buscar_notas_aluno(self, ra: str, materia: str) -> typing.Optional[tuple[typing.Optional[float], typing.Optional[float], typing.Optional[float]]]:
+        """Retorna as notas (np1, np2, pim) de um aluno para uma matéria."""
+        self._conectar()
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT np1, np2, pim FROM Notas WHERE ra_aluno = ? AND materia = ?",
+                (ra.upper(), materia)
+            )
+            notas = cursor.fetchone()
+            if notas:
+                return (notas['np1'], notas['np2'], notas['pim'])
+            return None
+        except sqlite3.Error as e:
+            print(f"Erro ao buscar notas: {e}")
+            return None
+        finally:
+            self.fechar_conexao()
+            
+    def lancar_nota(self, ra_aluno: str, materia: str, tipo_nota: str, nota: float) -> tuple[bool, str]:
+        """Lança ou atualiza uma nota específica (NP1, NP2 ou PIM)."""
+        self._conectar()
+        ra_aluno = ra_aluno.upper()
+        tipo_nota_lower = tipo_nota.lower()
+        
+        if tipo_nota_lower not in ['np1', 'np2', 'pim']:
+            return False, "Tipo de nota inválido. Deve ser 'NP1', 'NP2' ou 'PIM'."
+        
+        if not 0.0 <= nota <= 10.0:
+            return False, "A nota deve estar entre 0.0 e 10.0."
+            
+        try:
+            cursor = self.conn.cursor()
+            
+            cursor.execute("SELECT 1 FROM Notas WHERE ra_aluno = ? AND materia = ?", (ra_aluno, materia))
+            if cursor.fetchone() is None:
+                return False, f"Aluno RA {ra_aluno} não matriculado na matéria {materia}."
+                
+            sql = f"UPDATE Notas SET {tipo_nota_lower} = ? WHERE ra_aluno = ? AND materia = ?"
+            cursor.execute(sql, (nota, ra_aluno, materia))
+            self.conn.commit()
+            
+            return True, "Nota atualizada com sucesso!"
+        except sqlite3.Error as e:
+            return False, f"Erro ao lançar nota: {e}"
+        finally:
+            self.fechar_conexao()
