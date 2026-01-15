@@ -69,3 +69,19 @@ class CalculadoraAcademica:
         nota_necessaria = 10.0 - ms
         nota_necessaria_limitada = max(self.NOTA_MINIMA, min(nota_necessaria, self.NOTA_MAXIMA))
         return round(nota_necessaria_limitada, 2)
+    
+    def gerar_feedback_ia(self, ms: float, status: str, materia: str) -> str:
+        """Gera um feedback motivacional baseado no status."""
+        
+        if ms is None or status.startswith("Erro"):
+            return "Não foi possível gerar feedback. Verifique a validade das notas informadas."
+            
+        if status == "Aprovado":
+            return f"Parabéns! Sua média em **{materia}** é excelente ({ms:.2f}). Você está **Aprovado**! Mantenha o foco nas outras disciplinas. 🎉"
+        elif status == "Em Exame":
+            nota_exame = self.calcular_nota_exame(ms)
+            return f"Atenção! Sua média em **{materia}** é {ms:.2f}. Você está de **Exame Final**. Será necessário dedicação para garantir a aprovação. Você precisa de aproximadamente **{nota_exame:.2f}** pontos no Exame. 📚"
+        elif status == "Reprovado":
+            return f"Alerta! Sua média em **{materia}** ({ms:.2f}) indica **Reprovação**. Procure o coordenador do curso para verificar as opções de recuperação. 🛑"
+        else:
+            return "Status acadêmico em análise."
