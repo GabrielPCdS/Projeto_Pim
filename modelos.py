@@ -56,3 +56,18 @@ class Aluno(Pessoa):
         # Garante que o RA esteja em maiúsculas (customização do Aluno)
         if self.ra:
             self.ra = str(self.ra).upper()
+
+@dataclass
+class Professor(Pessoa):
+    """Modelo de dados para um Professor."""
+    materia_principal: str # Matéria principal que leciona
+    
+    # Define o tipo, sobrescrevendo o campo 'tipo' de Pessoa
+    tipo: str = field(init=False, default='professor')
+    
+    def __post_init__(self):
+        """
+        Executa a inicialização da classe base.
+        """
+        # Chama o __post_init__ da classe Pessoa para limpeza e conversão de e-mail
+        super().__post_init__()
