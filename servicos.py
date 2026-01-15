@@ -27,3 +27,45 @@ class CalculadoraAcademica:
                 return False, f"A nota de {nome} ({nota:.2f}) deve estar entre {self.NOTA_MINIMA:.1f} e {self.NOTA_MAXIMA:.1f}."
         
         return True, ""
+    
+    # -----------------------------------------------
+    # MÉTODOS ACADÊMICOS
+    # -----------------------------------------------
+
+    def calcular_ms(self, np1: float, np2: float, pim: float) -> Tuple[Union[float, None], str, str]:
+        """
+        Calcula a Média Semestral (MS), o Status e a Cor do Status.
+        Retorno: (MS | None, Status, Cor_Bootstrap)
+        """
+        # APLICANDO A NOVA VALIDAÇÃO
+        valido, erro_msg = self._validar_notas_range(np1, np2, pim)
+        if not valido:
+            return None, f"Erro de Cálculo: {erro_msg}", "secondary"
+
+        # Cálculo da Média Semestral
+        ms = (np1 * self.PESO_NP1) + (np2 * self.PESO_NP2) + (pim * self.PESO_PIM)
+        ms_arredondada = round(ms, 2)
+        
+        status = ""
+        cor_status = "" 
+        
+        if ms_arredondada >= self.NOTA_APROVACAO:
+            status = "Aprovado"
+            cor_status = "success"
+        elif ms_arredondada >= self.NOTA_EXAME_MIN:
+            status = "Em Exame"
+            cor_status = "warning"
+        else:
+            status = "Reprovado"
+            cor_status = "danger"
+            
+        return ms_arredondada, status, cor_status
+
+    def calcular_nota_exame(self, ms: float) -> float:
+        """
+        Calcula a nota mínima necessária no Exame Final (para a média final ser 5.0).
+        Média Final = (MS + Exame) / 2
+        """
+        nota_necessaria = 10.0 - ms
+        nota_necessaria_limitada = max(self.NOTA_MINIMA, min(nota_necessaria, self.NOTA_MAXIMA))
+        return round(nota_necessaria_limitada, 2)
