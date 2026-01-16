@@ -6,7 +6,7 @@ import typing
 
 # IMPORTAÇÕES DOS NOSSOS MÓDULOS (Conexão entre arquivos)
 from modelos import Aluno, Professor, MATERIAS_ADS, PIM_MATERIA
-from calculadora_academica import CalculadoraAcademica
+from servicos import CalculadoraAcademica
 from gestor_db import GestorBD
 
 # --- CONSTANTES DE INTERFACE ---
