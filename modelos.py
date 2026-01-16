@@ -1,13 +1,20 @@
 from dataclasses import dataclass, field
 import typing
 
-# Lista de matérias para o curso ADS - MANTIDA SEM ALTERAÇÕES
+# --- CONSTANTES GLOBAIS ---
+# Esta constante precisava estar aqui para ser importada pelo main.py
+PIM_MATERIA = "PROJ INTEG MULTIDISCIPLINAR II"
+
+# Lista de matérias para o curso ADS
 MATERIAS_ADS = [
-    "Programação Orientada a Objetos",
-    "Banco de Dados",
-    "Estrutura de Dados",
-    "Sistemas Operacionais"
+    PIM_MATERIA,
+    "ENGENHARIA DE SOFTWARE AGIL",
+    "ALGORIT E ESTRUT DADOS PYTHON",
+    "PROGRAMACAO ESTRUTURADA EM C",
+    "ANALISE E PROJETO DE SISTEMAS"
 ]
+
+# --- CLASSES DE MODELO ---
 
 @dataclass
 class Pessoa:
@@ -35,7 +42,6 @@ class Pessoa:
         # Converte e-mail para minúsculas se existir
         if self.email is not None:
             self.email = self.email.lower()
-
 
 @dataclass
 class Aluno(Pessoa):
