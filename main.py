@@ -385,3 +385,96 @@ class PainelAluno(ttk.Frame):
             self.labels_projecao_resultado[materia].config(text=f"Simulação: {ms:.2f} ({st})", bootstyle=cor)
         except ValueError:
             messagebox.showerror("Erro", "Valores inválidos")
+
+class FormularioLancamentoNotas(tk.Toplevel):
+    def __init__(self, master, gestor_bd, materia, ra, callback):
+        super().__init__(master); self.gestor = gestor_bd; self.materia = materia; self.ra = ra; self.cb = callback
+        self.title(f"Notas - {ra}"); self.geometry("300x250")
+        
+        ttk.Label(self, text=f"Notas para {materia}", font=('Arial', 10, 'bold')).pack(pady=10)
+        self.entries = {}
+        for k in ["NP1", "NP2", "PIM"]:
+            frame = ttk.Frame(self); frame.pack(pady=5)
+            ttk.Label(frame, text=k).pack(side='left')
+            self.entries[k] = ttk.Entry(frame, width=10); self.entries[k].pack(side='left')
+            
+        ttk.Button(self, text="Salvar", command=self._salvar, bootstyle="success").pack(pady=15)
+        self._carregar()
+
+    def _carregar(self):
+        np1, np2, _ = self.gestor.buscar_notas_aluno(self.ra, self.materia)
+        _, _, pim = self.gestor.buscar_notas_aluno(self.ra, PIM_MATERIA) # PIM Global
+        
+        if np1: self.entries['NP1'].insert(0, np1)
+        if np2: self.entries['NP2'].insert(0, np2)
+        if pim: self.entries['PIM'].insert(0, pim)
+        
+        # Regra de negócio: PIM só edita na matéria PIM
+        if self.materia != PIM_MATERIA:
+            self.entries['PIM'].config(state='disabled')
+
+    def _salvar(self):
+        try:
+            n1 = float(self.entries['NP1'].get()) if self.entries['NP1'].get() else None
+            n2 = float(self.entries['NP2'].get()) if self.entries['NP2'].get() else None
+            pim_val = float(self.entries['PIM'].get()) if self.entries['PIM'].get() else None
+            
+            self.gestor.lancar_nota(self.ra, self.materia, 'NP1', n1 if n1 is not None else 0)
+            self.gestor.lancar_nota(self.ra, self.materia, 'NP2', n2 if n2 is not None else 0)
+            
+            # Se for matéria PIM, lança o PIM.
+            if self.materia == PIM_MATERIA and pim_val is not None:
+                # Atualiza PIM em TODAS as matérias (Requisito do Sistema)
+                for m in MATERIAS_ADS:
+                     self.gestor.lancar_nota(self.ra, m, 'PIM', pim_val)
+
+            messagebox.showinfo("Sucesso", "Notas salvas!"); self.cb(self.ra); self.destroy()
+        except ValueError: messagebox.showerror("Erro", "Valores numéricos inválidos")
+
+class PainelProfessor(ttk.Frame):
+    def __init__(self, master, app):
+        super().__init__(master, padding=20)
+        self.app = app; self.gestor = app.gestor_bd; self.materia = app.materia_logado
+        
+        ttk.Label(self, text=f"Professor - {self.materia}", font=('Arial', 18, 'bold')).pack(pady=10)
+        ttk.Button(self, text="Sair", command=lambda: app.mostrar_tela(TelaLogin), bootstyle="danger").pack(anchor='ne')
+        
+        ttk.Button(self, text="Cadastrar Aluno (Rápido)", command=self._cadastrar_aluno_rapido).pack(pady=5)
+        
+        self.tree = ttk.Treeview(self, columns=('RA', 'Nome', 'Média', 'Status'), show='headings')
+        for c in ('RA', 'Nome', 'Média', 'Status'): self.tree.heading(c, text=c)
+        self.tree.pack(expand=True, fill='both')
+        self.tree.bind('<Double-1>', self._editar_nota)
+        self._atualizar()
+
+    def _atualizar(self, *args):
+        self.tree.delete(*self.tree.get_children())
+        alunos = self.gestor.buscar_todos_alunos_da_materia(self.materia)
+        for nome, ra in alunos:
+            np1, np2, _ = self.gestor.buscar_notas_aluno(ra, self.materia)
+            _, _, pim = self.gestor.buscar_notas_aluno(ra, PIM_MATERIA)
+            ms, st, _ = self.app.calculadora.calcular_ms(np1 or 0, np2 or 0, pim or 0)
+            self.tree.insert('', END, values=(ra, nome, f"{ms:.2f}", st))
+
+    def _editar_nota(self, event):
+        item = self.tree.selection()
+        if not item: return
+        ra = self.tree.item(item, 'values')[0]
+        FormularioLancamentoNotas(self, self.gestor, self.materia, ra, self._atualizar)
+        
+    def _cadastrar_aluno_rapido(self):
+        # Janela simples para cadastro rápido pelo professor
+        top = tk.Toplevel(self); top.title("Novo Aluno")
+        ttk.Label(top, text="Nome:").pack(); e_nome = ttk.Entry(top); e_nome.pack()
+        ttk.Label(top, text="RA:").pack(); e_ra = ttk.Entry(top); e_ra.pack()
+        def save():
+             if self.gestor.adicionar_aluno_professor(e_nome.get(), e_ra.get(), self.materia, "123456"):
+                 messagebox.showinfo("Ok", "Cadastrado! Senha inicial: 123456"); self._atualizar(); top.destroy()
+             else: messagebox.showerror("Erro", "Erro ao cadastrar")
+        ttk.Button(top, text="Salvar", command=save).pack(pady=10)
+
+if __name__ == "__main__":
+    app = App()
+    app.mainloop()
+
+    
