@@ -282,4 +282,106 @@ class TelaPrimeiroAcesso(ttk.Frame):
             self.app.mostrar_tela(PainelAluno)
         else:
             messagebox.showerror("Erro", msg)
+
+class PainelAluno(ttk.Frame):
+    def __init__(self, master, app):
+        super().__init__(master, padding=20)
+        self.app = app
+        self.ra = app.ra_logado
+        self.gestor_bd = app.gestor_bd
+        self.calculadora = app.calculadora
+        self._materia_frames = {}
+        self.entradas_projecao = {}
+        self.labels_projecao_resultado = {}
+        
+        self._criar_widgets()
+        self._atualizar_todas_abas() 
+
+    def _criar_widgets(self):
+        header = ttk.Frame(self, padding=(15, 10), bootstyle="primary")
+        header.pack(fill='x', pady=(0, 15))
+        ttk.Label(header, text=f"Bem-vindo(a), {self.app.usuario_logado['nome']}!", font=('Arial', 20, 'bold'), bootstyle="inverse-primary").pack(side=tk.LEFT, padx=10)
+        ttk.Button(header, text="Sair", command=lambda: self.app.mostrar_tela(TelaLogin), bootstyle="danger").pack(side=tk.RIGHT, padx=10)
+        
+        self.notebook = ttk.Notebook(self, bootstyle="primary")
+        self.notebook.pack(expand=True, fill="both")
+        self._criar_aba_resumo()
+        for materia in MATERIAS_ADS:
+            self._criar_aba_materia(materia)
             
+    def _criar_aba_resumo(self):
+        frame = ttk.Frame(self.notebook, padding=15)
+        self.notebook.add(frame, text="Sumário")
+        self.tree_resumo = ttk.Treeview(frame, columns=('NP1', 'NP2', 'PIM', 'MS', 'Status'), show='headings', bootstyle="info")
+        for col in ('NP1', 'NP2', 'PIM', 'MS', 'Status'): self.tree_resumo.heading(col, text=col)
+        self.tree_resumo.pack(expand=True, fill='both')
+        self.tree_resumo.tag_configure('success', foreground='#28a745'); self.tree_resumo.tag_configure('danger', foreground='#dc3545')
+
+    def _criar_aba_materia(self, materia):
+        frame = ttk.Frame(self.notebook, padding=15)
+        self.notebook.add(frame, text=materia)
+        frame.columnconfigure(0, weight=1); frame.columnconfigure(1, weight=1)
+        
+        # Frame Notas
+        f_notas = ttk.Labelframe(frame, text="Notas Lançadas", bootstyle="primary")
+        f_notas.grid(row=0, column=0, padx=10, sticky='nsew')
+        self._materia_frames[materia] = {}
+        for i, nome in enumerate(["NP1", "NP2", "PIM", "Média", "Status"]):
+            ttk.Label(f_notas, text=f"{nome}:").grid(row=i, column=0, sticky='w')
+            lbl = ttk.Label(f_notas, text="-")
+            lbl.grid(row=i, column=1, sticky='e')
+            self._materia_frames[materia][nome] = lbl
+
+        # Frame Projeção
+        f_proj = ttk.Labelframe(frame, text="Simulador (Se MS < 7.0)", bootstyle="info")
+        f_proj.grid(row=0, column=1, padx=10, sticky='nsew')
+        self.entradas_projecao[materia] = {}
+        for i, key in enumerate(['NP1', 'NP2', 'PIM']):
+            ttk.Label(f_proj, text=f"Simular {key}:").grid(row=i, column=0)
+            e = ttk.Entry(f_proj, width=10); e.grid(row=i, column=1)
+            self.entradas_projecao[materia][key] = e
+            
+        ttk.Button(f_proj, text="Calcular", command=lambda m=materia: self._simular(m)).grid(row=3, columnspan=2, pady=10)
+        self.labels_projecao_resultado[materia] = ttk.Label(f_proj, text="Resultado: -")
+        self.labels_projecao_resultado[materia].grid(row=4, columnspan=2)
+        
+        # Feedback
+        self.labels_projecao_resultado[materia+"_FB"] = ttk.Label(frame, text="Dica...", bootstyle="secondary", wraplength=700)
+        self.labels_projecao_resultado[materia+"_FB"].grid(row=1, columnspan=2, pady=10)
+
+    def _atualizar_todas_abas(self):
+        self.tree_resumo.delete(*self.tree_resumo.get_children())
+        _, _, pim_g = self.gestor_bd.buscar_notas_aluno(self.ra, PIM_MATERIA)
+        
+        for mat in MATERIAS_ADS:
+            np1, np2, _ = self.gestor_bd.buscar_notas_aluno(self.ra, mat)
+            pim = pim_g
+            ms, st, cor = self.calculadora.calcular_ms(np1 or 0, np2 or 0, pim or 0)
+            
+            # Atualiza labels
+            lbls = self._materia_frames[mat]
+            lbls['NP1'].config(text=f"{np1:.1f}" if np1 else "-")
+            lbls['NP2'].config(text=f"{np2:.1f}" if np2 else "-")
+            lbls['PIM'].config(text=f"{pim:.1f}" if pim else "-")
+            lbls['Média'].config(text=f"{ms:.2f}", bootstyle=cor)
+            lbls['Status'].config(text=st, bootstyle=cor)
+            
+            self.tree_resumo.insert('', END, values=(np1, np2, pim, f"{ms:.2f}", st), tags=(cor,))
+            
+            # Feedback
+            if st in ["Reprovado", "Em Exame"]:
+                msg = FEEDBACKS_ESTUDO.get(mat, "Estude mais!")
+                self.labels_projecao_resultado[mat+"_FB"].config(text=f"⚠️ {msg}", bootstyle="danger")
+            else:
+                 self.labels_projecao_resultado[mat+"_FB"].config(text="Aprovado! Parabéns.", bootstyle="success")
+
+    def _simular(self, materia):
+        ents = self.entradas_projecao[materia]
+        try:
+            v_np1 = float(ents['NP1'].get().replace(',','.')) if ents['NP1'].get() else 0.0
+            v_np2 = float(ents['NP2'].get().replace(',','.')) if ents['NP2'].get() else 0.0
+            v_pim = float(ents['PIM'].get().replace(',','.')) if ents['PIM'].get() else 0.0
+            ms, st, cor = self.calculadora.calcular_ms(v_np1, v_np2, v_pim)
+            self.labels_projecao_resultado[materia].config(text=f"Simulação: {ms:.2f} ({st})", bootstyle=cor)
+        except ValueError:
+            messagebox.showerror("Erro", "Valores inválidos")
